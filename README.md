@@ -15,6 +15,17 @@ Built on the [v6.db.transport.rest](https://v6.db.transport.rest) API, which is 
 | `get_station_info` | Address, coordinates, and facilities (lifts, accessible toilets, etc.) for a station. |
 | `nearby_stations` | Stations near a lat/lon coordinate. |
 
+## Transports
+
+```bash
+# stdio (default — what every MCP client expects)
+uv run db-mcp
+
+# HTTP / SSE for browser-resident clients and curl debugging
+uv run db-mcp --transport sse --port 8765
+uv run db-mcp --transport streamable-http --port 8765
+```
+
 ## Install via uvx (no clone needed)
 
 If your client supports it, you can run the server straight from this repo with no install step:

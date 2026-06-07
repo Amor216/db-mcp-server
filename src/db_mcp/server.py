@@ -111,5 +111,13 @@ def nearby_stations(
     return formatters.format_nearby(items)
 
 
-def run() -> None:
-    mcp.run()
+def run(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8765) -> None:
+    if transport == "stdio":
+        mcp.run()
+        return
+    if transport in ("sse", "streamable-http"):
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.run(transport=transport)
+        return
+    raise ValueError(f"unknown transport: {transport!r}. expected stdio | sse | streamable-http")

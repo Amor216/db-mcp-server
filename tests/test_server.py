@@ -38,8 +38,13 @@ def test_plan_journey_renders_block():
     assert "2h30" in out
 
 
-def test_mcp_registers_five_tools():
-    # FastMCP stores tools internally; spot-check our five exist as attributes
+def test_mcp_registers_six_tools():
     for name in ("search_station", "get_departures", "plan_journey",
-                 "get_trip_details", "nearby_stations"):
+                 "get_trip_details", "get_station_info", "nearby_stations"):
         assert hasattr(server, name)
+
+
+def test_run_rejects_unknown_transport():
+    import pytest
+    with pytest.raises(ValueError, match="unknown transport"):
+        server.run(transport="quic")
