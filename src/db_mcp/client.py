@@ -1,9 +1,11 @@
+import time
 from typing import Any
 
 import httpx
 
 BASE_URL = "https://v6.db.transport.rest"
 TIMEOUT = 10.0
+STATION_CACHE_TTL = 300.0
 
 
 class DBError(RuntimeError):
@@ -11,11 +13,14 @@ class DBError(RuntimeError):
 
 
 class DBClient:
-    def __init__(self, base_url: str = BASE_URL, timeout: float = TIMEOUT) -> None:
+    def __init__(self, base_url: str = BASE_URL, timeout: float = TIMEOUT,
+                 cache_ttl: float = STATION_CACHE_TTL) -> None:
         self._client = httpx.Client(base_url=base_url, timeout=timeout, headers={
             "User-Agent": "db-mcp-server (https://github.com/Amor216/db-mcp-server)",
             "Accept": "application/json",
         })
+        self._cache_ttl = cache_ttl
+        self._cache: dict[tuple[str, frozenset[tuple[str, Any]]], tuple[float, Any]] = {}
 
     def close(self) -> None:
         self._client.close()
@@ -43,7 +48,7 @@ class DBClient:
             raise DBError(f"invalid json: {e}") from e
 
     def locations(self, query: str, results: int = 5, fuzzy: bool = True) -> list[dict]:
-        return self._get("/locations", {"query": query, "results": results, "fuzzy": fuzzy})
+        return self._cached_get("/locations", {"query": query, "results": results, "fuzzy": fuzzy})
 
     def departures(self, stop_id: str, duration: int = 60, results: int = 8,
                    when: str | None = None) -> dict:
@@ -62,10 +67,22 @@ class DBClient:
 
     def nearby(self, latitude: float, longitude: float, distance_m: int = 1000,
                results: int = 6) -> list[dict]:
-        return self._get("/locations/nearby", {
+        return self._cached_get("/locations/nearby", {
             "latitude": latitude, "longitude": longitude,
             "distance": distance_m, "results": results,
         })
+
+    def _cached_get(self, path: str, params: dict[str, Any]) -> Any:
+        if self._cache_ttl <= 0:
+            return self._get(path, params)
+        key = (path, frozenset((k, v) for k, v in params.items() if v is not None))
+        now = time.monotonic()
+        hit = self._cache.get(key)
+        if hit is not None and now - hit[0] < self._cache_ttl:
+            return hit[1]
+        data = self._get(path, params)
+        self._cache[key] = (now, data)
+        return data
 
 
 def _clean_params(params: dict[str, Any]) -> dict[str, Any]:
