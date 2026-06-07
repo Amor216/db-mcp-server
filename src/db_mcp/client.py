@@ -132,6 +132,9 @@ class DBClient:
     def trip(self, trip_id: str) -> dict:
         return self._get(f"/trips/{trip_id}", {"stopovers": True, "remarks": True})
 
+    def station_info(self, station_id: str) -> dict:
+        return self._cached_get(f"/stations/{station_id}", {})
+
     def nearby(self, latitude: float, longitude: float, distance_m: int = 1000,
                results: int = 6) -> list[dict]:
         return self._cached_get("/locations/nearby", {

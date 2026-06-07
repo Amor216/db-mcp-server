@@ -1,9 +1,32 @@
 from db_mcp.formatters import (
     format_departures,
     format_journeys,
+    format_station_info,
     format_stations,
     format_trip,
 )
+
+
+def test_station_info_basic():
+    out = format_station_info({
+        "id": "8011160",
+        "name": "Berlin Hbf",
+        "location": {"latitude": 52.5251, "longitude": 13.3694},
+        "address": {"city": "Berlin", "street": "Europaplatz 1", "zipcode": "10557"},
+        "facilities": {"lift": True, "wheelchair_accessible_toilet": True, "parking": False},
+    })
+    assert "Berlin Hbf" in out
+    assert "8011160" in out
+    assert "Europaplatz 1" in out
+    assert "10557 Berlin" in out
+    assert "lift" in out
+    assert "wheelchair_accessible_toilet" in out
+    assert "parking" not in out
+
+
+def test_station_info_minimal():
+    out = format_station_info({"id": "1", "name": "Tiny"})
+    assert "Tiny (1)" in out
 
 
 def test_stations_empty():

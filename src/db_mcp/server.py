@@ -83,6 +83,19 @@ def get_trip_details(
 
 
 @mcp.tool()
+def get_station_info(
+    station_id: Annotated[str, Field(description="Station ID from search_station, e.g. '8011160'")],
+) -> str:
+    """Get full details for a German train station: address, coordinates, facilities (lifts,
+    accessible toilets, parking, taxis, dining, shops, etc.)."""
+    try:
+        payload = _db().station_info(station_id=station_id)
+    except DBError as e:
+        return f"error: {e}"
+    return formatters.format_station_info(payload)
+
+
+@mcp.tool()
 def nearby_stations(
     latitude: Annotated[float, Field(description="Latitude in WGS84")],
     longitude: Annotated[float, Field(description="Longitude in WGS84")],

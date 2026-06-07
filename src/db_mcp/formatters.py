@@ -81,6 +81,30 @@ def format_nearby(items: list[dict]) -> str:
     return format_stations(items)
 
 
+def format_station_info(payload: dict) -> str:
+    name = payload.get("name") or "?"
+    sid = payload.get("id") or "?"
+    loc = payload.get("location") or {}
+    address = payload.get("address") or {}
+    facilities = payload.get("ril100") or payload.get("facilities") or {}
+
+    parts = [f"{name} ({sid})"]
+    if address:
+        city = address.get("city") or ""
+        street = address.get("street") or ""
+        zipcode = address.get("zipcode") or ""
+        line = ", ".join(p for p in (street, f"{zipcode} {city}".strip()) if p)
+        if line:
+            parts.append(f"address: {line}")
+    if loc.get("latitude") and loc.get("longitude"):
+        parts.append(f"location: {loc['latitude']:.4f}, {loc['longitude']:.4f}")
+    if isinstance(facilities, dict) and facilities:
+        flags = [k for k, v in facilities.items() if v]
+        if flags:
+            parts.append("facilities: " + ", ".join(sorted(flags)))
+    return "\n".join(parts)
+
+
 def _hhmm(iso: str | None) -> str:
     if not iso:
         return ""

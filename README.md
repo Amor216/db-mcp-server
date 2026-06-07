@@ -1,6 +1,6 @@
 # db-mcp-server
 
-An [MCP](https://modelcontextprotocol.io) server that exposes the Deutsche Bahn public transport API to any MCP-compatible client (Claude Desktop, Cursor, Cline, Continue, etc.). Five tools cover station search, departures, journey planning, trip details, and nearby stations.
+An [MCP](https://modelcontextprotocol.io) server that exposes the Deutsche Bahn public transport API to any MCP-compatible client (Claude Desktop, Cursor, Cline, Continue, etc.). Six tools cover station search, departures, journey planning, trip details, station info, and nearby stations.
 
 Built on the [v6.db.transport.rest](https://v6.db.transport.rest) API, which is free and requires no authentication. ~400 lines of Python.
 
@@ -12,6 +12,7 @@ Built on the [v6.db.transport.rest](https://v6.db.transport.rest) API, which is 
 | `get_departures` | Upcoming departures from a station with line, direction, platform, delay. |
 | `plan_journey` | Connection between two stations with duration, transfers, platforms. |
 | `get_trip_details` | Full stop-by-stop schedule for one specific train. |
+| `get_station_info` | Address, coordinates, and facilities (lifts, accessible toilets, etc.) for a station. |
 | `nearby_stations` | Stations near a lat/lon coordinate. |
 
 ## Install via uvx (no clone needed)
