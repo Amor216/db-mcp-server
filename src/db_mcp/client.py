@@ -9,7 +9,36 @@ STATION_CACHE_TTL = 300.0
 
 
 class DBError(RuntimeError):
-    pass
+    kind: str = "error"
+
+    def __init__(self, message: str, *, status: int | None = None, path: str | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+        self.path = path
+
+
+class NetworkError(DBError):
+    kind = "network"
+
+
+class UpstreamError(DBError):
+    kind = "upstream"
+
+
+class NotFoundError(DBError):
+    kind = "not_found"
+
+
+class BadRequestError(DBError):
+    kind = "bad_request"
+
+
+class InvalidResponseError(DBError):
+    kind = "invalid_response"
+
+
+class RateLimitedError(DBError):
+    kind = "rate_limited"
 
 
 class DBClient:
@@ -35,17 +64,21 @@ class DBClient:
         try:
             r = self._client.get(path, params=_clean_params(params or {}))
         except httpx.HTTPError as e:
-            raise DBError(f"network: {e}") from e
+            raise NetworkError(f"network: {e}", path=path) from e
+        if r.status_code == 429:
+            raise RateLimitedError(f"rate limited at {path}", status=429, path=path)
         if r.status_code >= 500:
-            raise DBError(f"upstream error {r.status_code}: {r.text[:200]}")
+            raise UpstreamError(f"upstream error {r.status_code}: {r.text[:200]}",
+                                status=r.status_code, path=path)
         if r.status_code == 404:
-            raise DBError(f"not found: {path}")
+            raise NotFoundError(f"not found: {path}", status=404, path=path)
         if r.status_code >= 400:
-            raise DBError(f"bad request {r.status_code}: {r.text[:200]}")
+            raise BadRequestError(f"bad request {r.status_code}: {r.text[:200]}",
+                                  status=r.status_code, path=path)
         try:
             return r.json()
         except ValueError as e:
-            raise DBError(f"invalid json: {e}") from e
+            raise InvalidResponseError(f"invalid json: {e}", path=path) from e
 
     def locations(self, query: str, results: int = 5, fuzzy: bool = True) -> list[dict]:
         return self._cached_get("/locations", {"query": query, "results": results, "fuzzy": fuzzy})

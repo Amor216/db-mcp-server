@@ -2,7 +2,15 @@ import pytest
 import respx
 from httpx import Response
 
-from db_mcp.client import BASE_URL, DBClient, DBError
+from db_mcp.client import (
+    BASE_URL,
+    BadRequestError,
+    DBClient,
+    DBError,
+    NotFoundError,
+    RateLimitedError,
+    UpstreamError,
+)
 
 
 @respx.mock
@@ -104,3 +112,36 @@ def test_departures_not_cached():
         c.departures("1")
         c.departures("1")
     assert route.call_count == 2
+
+
+@respx.mock
+def test_typed_errors_carry_status_and_path():
+    respx.get(f"{BASE_URL}/locations").mock(return_value=Response(503, text="boom"))
+    with DBClient() as c, pytest.raises(UpstreamError) as ei:
+        c.locations("x")
+    assert ei.value.status == 503
+    assert ei.value.path == "/locations"
+    assert isinstance(ei.value, DBError)
+    assert ei.value.kind == "upstream"
+
+
+@respx.mock
+def test_429_raises_rate_limited():
+    respx.get(f"{BASE_URL}/locations").mock(return_value=Response(429))
+    with DBClient() as c, pytest.raises(RateLimitedError) as ei:
+        c.locations("x")
+    assert ei.value.kind == "rate_limited"
+
+
+@respx.mock
+def test_404_is_not_found_subclass():
+    respx.get(f"{BASE_URL}/trips/nope").mock(return_value=Response(404))
+    with DBClient() as c, pytest.raises(NotFoundError):
+        c.trip("nope")
+
+
+@respx.mock
+def test_400_is_bad_request_subclass():
+    respx.get(f"{BASE_URL}/locations").mock(return_value=Response(400, text="bad"))
+    with DBClient() as c, pytest.raises(BadRequestError):
+        c.locations("x")
