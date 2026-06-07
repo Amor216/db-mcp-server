@@ -1,3 +1,4 @@
+import threading
 import time
 from typing import Any
 
@@ -6,6 +7,33 @@ import httpx
 BASE_URL = "https://v6.db.transport.rest"
 TIMEOUT = 10.0
 STATION_CACHE_TTL = 300.0
+DEFAULT_RPS = 5.0
+
+
+class TokenBucket:
+    def __init__(self, rate_per_second: float, burst: int | None = None) -> None:
+        self.rate = max(0.0, rate_per_second)
+        self.capacity = float(burst if burst is not None else max(1, int(rate_per_second)))
+        self.tokens = self.capacity
+        self.last = time.monotonic()
+        self._lock = threading.Lock()
+
+    def take(self) -> float:
+        if self.rate <= 0:
+            return 0.0
+        with self._lock:
+            now = time.monotonic()
+            elapsed = now - self.last
+            self.last = now
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+            if self.tokens >= 1.0:
+                self.tokens -= 1.0
+                return 0.0
+            needed = 1.0 - self.tokens
+            wait = needed / self.rate
+            self.tokens = 0.0
+            self.last = now + wait
+            return wait
 
 
 class DBError(RuntimeError):
@@ -43,13 +71,16 @@ class RateLimitedError(DBError):
 
 class DBClient:
     def __init__(self, base_url: str = BASE_URL, timeout: float = TIMEOUT,
-                 cache_ttl: float = STATION_CACHE_TTL) -> None:
+                 cache_ttl: float = STATION_CACHE_TTL,
+                 rate_per_second: float = DEFAULT_RPS,
+                 burst: int | None = None) -> None:
         self._client = httpx.Client(base_url=base_url, timeout=timeout, headers={
             "User-Agent": "db-mcp-server (https://github.com/Amor216/db-mcp-server)",
             "Accept": "application/json",
         })
         self._cache_ttl = cache_ttl
         self._cache: dict[tuple[str, frozenset[tuple[str, Any]]], tuple[float, Any]] = {}
+        self._bucket = TokenBucket(rate_per_second, burst)
 
     def close(self) -> None:
         self._client.close()
@@ -61,6 +92,9 @@ class DBClient:
         self.close()
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        wait = self._bucket.take()
+        if wait > 0:
+            time.sleep(wait)
         try:
             r = self._client.get(path, params=_clean_params(params or {}))
         except httpx.HTTPError as e:

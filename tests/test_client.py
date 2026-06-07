@@ -145,3 +145,26 @@ def test_400_is_bad_request_subclass():
     respx.get(f"{BASE_URL}/locations").mock(return_value=Response(400, text="bad"))
     with DBClient() as c, pytest.raises(BadRequestError):
         c.locations("x")
+
+
+def test_token_bucket_zero_rate_no_wait():
+    from db_mcp.client import TokenBucket
+    b = TokenBucket(0.0)
+    assert b.take() == 0.0
+    assert b.take() == 0.0
+
+
+def test_token_bucket_serves_burst_immediately():
+    from db_mcp.client import TokenBucket
+    b = TokenBucket(rate_per_second=10.0, burst=5)
+    for _ in range(5):
+        assert b.take() == 0.0
+
+
+def test_token_bucket_delays_after_burst():
+    from db_mcp.client import TokenBucket
+    b = TokenBucket(rate_per_second=10.0, burst=1)
+    assert b.take() == 0.0
+    wait = b.take()
+    assert wait > 0
+    assert wait <= 0.11
